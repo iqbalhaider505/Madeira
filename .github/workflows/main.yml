@@ -12,12 +12,16 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Install Build Tools
       run: brew install cmake ninja
 
     - name: Build FEX Dependencies
       run: |
+        git submodule update --init --recursive
         mkdir -p FEX/build-ios
         cd FEX/build-ios
         cmake .. -DCMAKE_BUILD_TYPE=Release
