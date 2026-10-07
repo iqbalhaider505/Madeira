@@ -18,25 +18,43 @@ jobs:
       with:
         xcode-version: 'latest-stable'
 
-    - name: Build iOS App (.app)
+    - name: Find Project and Build IPA
       run: |
-        xcodebuild -workspace *.xcworkspace -scheme Madeira -configuration Release -sdk iphoneos \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          BUILD_DIR=build \
-          clean build || \
-        xcodebuild -project *.xcodeproj -scheme Madeira -configuration Release -sdk iphoneos \
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          BUILD_DIR=build \
-          clean build
+        PROJ_PATH=$(find . -name "*.xcodeproj" -maxdepth 3 | head -n 1)
+        WORKSPACE_PATH=$(find . -name "*.xcworkspace" -maxdepth 3 | head -n 1)
+
+        if [ -z "$PROJ_PATH" ] && [ -z "$WORKSPACE_PATH" ]; then
+          echo "Error: No .xcodeproj or .xcworkspace found!"
+          exit 1
+        fi
+
+        echo "Found Project: $PROJ_PATH"
+        echo "Found Workspace: $WORKSPACE_PATH"
+
+        if [ -n "$WORKSPACE_PATH" ]; then
+          xcodebuild -workspace "$WORKSPACE_PATH" -scheme Madeira -configuration Release -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            BUILD_DIR=build \
+            clean build
+        else
+          xcodebuild -project "$PROJ_PATH" -scheme Madeira -configuration Release -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            BUILD_DIR=build \
+            clean build
+        fi
 
     - name: Create IPA Package
       run: |
         mkdir -p Payload
-        APP_PATH=$(find build/Release-iphoneos -name "*.app" | head -n 1)
+        APP_PATH=$(find build -name "*.app" | head -n 1)
+        if [ -z "$APP_PATH" ]; then
+          echo "Error: .app bundle not found!"
+          exit 1
+        fi
         cp -R "$APP_PATH" Payload/
         zip -r Madeira.ipa Payload
 
