@@ -1,4 +1,4 @@
-name: Build Unsigned IPA
+name: Build iOS App
 
 on:
   push:
@@ -7,59 +7,22 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
-    - name: Checkout Repository
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: 'latest-stable'
+    - name: Install Build Tools
+      run: brew install cmake ninja
 
-    - name: Find Project and Build IPA
+    - name: Build FEX Dependencies
       run: |
-        PROJ_PATH=$(find . -name "*.xcodeproj" -maxdepth 3 | head -n 1)
-        WORKSPACE_PATH=$(find . -name "*.xcworkspace" -maxdepth 3 | head -n 1)
+        mkdir -p FEX/build-ios
+        cd FEX/build-ios
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(sysctl -n hw.ncpu)
 
-        if [ -z "$PROJ_PATH" ] && [ -z "$WORKSPACE_PATH" ]; then
-          echo "Error: No .xcodeproj or .xcworkspace found!"
-          exit 1
-        fi
-
-        echo "Found Project: $PROJ_PATH"
-        echo "Found Workspace: $WORKSPACE_PATH"
-
-        if [ -n "$WORKSPACE_PATH" ]; then
-          xcodebuild -workspace "$WORKSPACE_PATH" -scheme Madeira -configuration Release -sdk iphoneos \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            BUILD_DIR=build \
-            clean build
-        else
-          xcodebuild -project "$PROJ_PATH" -scheme Madeira -configuration Release -sdk iphoneos \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            BUILD_DIR=build \
-            clean build
-        fi
-
-    - name: Create IPA Package
+    - name: Build IPA
       run: |
-        mkdir -p Payload
-        APP_PATH=$(find build -name "*.app" | head -n 1)
-        if [ -z "$APP_PATH" ]; then
-          echo "Error: .app bundle not found!"
-          exit 1
-        fi
-        cp -R "$APP_PATH" Payload/
-        zip -r Madeira.ipa Payload
-
-    - name: Upload IPA Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Madeira-Unsigned-IPA
-        path: Madeira.ipa
+        xcodebuild -project Madeira.xcodeproj -scheme Madeira -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO
